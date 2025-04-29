@@ -2,14 +2,21 @@ import pygame
 import random
 import sys
 import numpy as np
+import os
 from pygame.locals import *
+
+def resource_path(relative_path):
+    """Возвращает абсолютный путь к ресурсу, работает и для .exe и для .py"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 pygame.init()
 pygame.mixer.init()
 
 # Начальные размеры окна
-BASE_SCREEN_WIDTH = 800
-BASE_SCREEN_HEIGHT = 600
+BASE_SCREEN_WIDTH = 1280
+BASE_SCREEN_HEIGHT = 720
 SCREEN_WIDTH = BASE_SCREEN_WIDTH
 SCREEN_HEIGHT = BASE_SCREEN_HEIGHT
 
@@ -46,14 +53,30 @@ font_large, font_medium, font_small = get_scaled_fonts()
 FPS = 60
 clock = pygame.time.Clock()
 
+# Загрузка звуков
 music_enabled = True
+volume = 0.3  # Громкость по умолчанию
 background_music = None
+button_sound = None
+hover_sound = None
 try:
-    background_music = pygame.mixer.Sound("background_music.wav")
-    background_music.set_volume(0.3)
+    background_music = pygame.mixer.Sound(resource_path("background_music.wav"))
+    background_music.set_volume(volume)
     background_music.play(-1)
-except:
-    pass
+except Exception as e:
+    print("Не удалось загрузить background_music.wav:", e)
+
+try:
+    button_sound = pygame.mixer.Sound(resource_path("click.wav"))
+    button_sound.set_volume(0.6)
+except Exception as e:
+    print("Не удалось загрузить button_click.wav:", e)
+
+try:
+    hover_sound = pygame.mixer.Sound(resource_path("button_hover.wav"))
+    hover_sound.set_volume(0.5)
+except Exception as e:
+    print("Не удалось загрузить button_hover.wav:", e)
 
 class Star:
     def __init__(self):
@@ -81,6 +104,7 @@ class Button:
         self.color = color
         self.hover_color = hover_color
         self.is_hovered = False
+        self.was_hovered = False  # Новое поле
         self.dynamic_text = dynamic_text
         self.padding_x = scale_value(20, BASE_SCREEN_WIDTH, SCREEN_WIDTH)
         self.padding_y = scale_value(10, BASE_SCREEN_HEIGHT, SCREEN_HEIGHT)
@@ -105,15 +129,20 @@ class Button:
         surface.blit(self.text_surf, self.text_rect)
     
     def check_hover(self, pos):
-        self.is_hovered = self.rect.collidepoint(pos)
+        hovered = self.rect.collidepoint(pos)
+        if hovered and not self.was_hovered:
+            if hover_sound:
+                hover_sound.play()
+        self.was_hovered = hovered
+        self.is_hovered = hovered
         return self.is_hovered
-    
+
     def is_clicked(self, pos, event):
         return event.type == MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(pos)
 
 # Общая функция для обработки событий
 def handle_common_events(event, buttons, game_functions):
-    global SCREEN_WIDTH, SCREEN_HEIGHT, font_large, font_medium, font_small, screen, stars
+    global SCREEN_WIDTH, SCREEN_HEIGHT, font_large, font_medium, font_small, screen, stars, volume
     if event.type == QUIT:
         pygame.quit()
         sys.exit()
@@ -125,14 +154,18 @@ def handle_common_events(event, buttons, game_functions):
         stars.extend([Star() for _ in range(100)])
     if event.type == KEYDOWN:
         if event.key == K_1:
+            if button_sound: button_sound.play()
             game_functions.get(0, lambda: None)()
         elif event.key == K_2:
+            if button_sound: button_sound.play()
             game_functions.get(1, lambda: None)()
         elif event.key == K_0:
+            if button_sound: button_sound.play()
             pygame.quit()
             sys.exit()
     for i, button in enumerate(buttons):
         if button.is_clicked(pygame.mouse.get_pos(), event):
+            if button_sound: button_sound.play()
             if i == len(buttons) - 1:  # Кнопка выхода
                 pygame.quit()
                 sys.exit()
@@ -146,6 +179,40 @@ def handle_common_events(event, buttons, game_functions):
                         background_music.stop()
             else:
                 game_functions.get(i, lambda: None)()
+    # Обработка ползунка громкости
+    if event.type == MOUSEBUTTONDOWN and event.button == 1:
+        mx, my = pygame.mouse.get_pos()
+        slider_x = SCREEN_WIDTH - 160
+        slider_y = 20
+        slider_w = 120
+        slider_h = 16
+        if slider_x <= mx <= slider_x + slider_w and slider_y <= my <= slider_y + slider_h:
+            volume = (mx - slider_x) / slider_w
+            if background_music:
+                background_music.set_volume(volume)
+            if button_sound:
+                button_sound.set_volume(volume)
+            if hover_sound:
+                hover_sound.set_volume(volume * 0.8)
+
+def draw_volume_slider():
+    slider_x = SCREEN_WIDTH - 160
+    slider_y = 20
+    slider_w = 120
+    slider_h = 16
+    # Фон
+    pygame.draw.rect(screen, GRAY, (slider_x, slider_y, slider_w, slider_h), border_radius=8)
+    # Заполненная часть
+    pygame.draw.rect(screen, CYAN, (slider_x, slider_y, int(slider_w * volume), slider_h), border_radius=8)
+    # Обводка
+    pygame.draw.rect(screen, WHITE, (slider_x, slider_y, slider_w, slider_h), 2, border_radius=8)
+    # Эмодзи динамика слева от полоски через шрифт Segoe UI Emoji
+    emoji_font = pygame.font.SysFont('Segoe UI Emoji', scale_value(25, BASE_SCREEN_HEIGHT, SCREEN_HEIGHT))
+    vol_icon = emoji_font.render("🔊", True, WHITE)
+    icon_rect = vol_icon.get_rect()
+    icon_rect.centery = slider_y + slider_h // 2
+    icon_rect.right = slider_x - 8
+    screen.blit(vol_icon, icon_rect)
 
 def draw_animated_background():
     for star in stars:
@@ -311,6 +378,8 @@ def snake_game():
         pause_button.check_hover(mouse_pos)
         pause_button.draw(screen)
         
+        draw_volume_slider()
+        
         if paused:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
@@ -439,6 +508,8 @@ def game_2048():
         pause_button.check_hover(mouse_pos)
         pause_button.draw(screen)
         
+        draw_volume_slider()
+        
         if game_over:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
@@ -460,10 +531,10 @@ def game_2048():
 
 def main_menu():
     button_configs = [
-        ("1. Змейка", BLUE, (100, 150, 255), False, 0.4),
-        ("2. Игра 2048", GREEN, (100, 255, 100), False, 0.5),
-        ("Музыка: Вкл", CYAN, (150, 255, 255), True, 0.6),
-        ("0. Выход", PURPLE, (200, 100, 200), False, 0.7)
+        ("1. Змейка", BLUE, (100, 150, 255), False, 0.35),
+        ("2. Игра 2048", GREEN, (100, 255, 100), False, 0.48),
+        ("Музыка: Вкл", CYAN, (150, 255, 255), True, 0.61),
+        ("0. Выход", PURPLE, (200, 100, 200), False, 0.74)
     ]
     
     buttons = [Button(0.5, y_ratio, text, color, hover_color, dynamic_text)
@@ -477,6 +548,7 @@ def main_menu():
         
         screen.fill(BLACK)
         draw_animated_background()
+        draw_volume_slider()
         
         title = font_large.render("Игровой проект", True, YELLOW)
         title_y = scale_value(50, BASE_SCREEN_HEIGHT, SCREEN_HEIGHT)
