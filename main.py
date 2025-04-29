@@ -182,6 +182,7 @@ def snake_game():
     
     snake = [(GRID_WIDTH//2, GRID_HEIGHT//2)]
     direction = (1, 0)
+    pending_direction = direction
     food = (random.randint(0, GRID_WIDTH-1), random.randint(0, GRID_HEIGHT-1))
     bonuses = []
     obstacles = [(random.randint(0, GRID_WIDTH-1), random.randint(0, GRID_HEIGHT-1)) for _ in range(5) 
@@ -206,23 +207,25 @@ def snake_game():
             handle_common_events(event, [back_button, pause_button], {})
             if event.type == KEYDOWN:
                 if event.key == K_UP and direction != (0, 1):
-                    direction = (0, -1)
+                    pending_direction = (0, -1)
                 elif event.key == K_DOWN and direction != (0, -1):
-                    direction = (0, 1)
+                    pending_direction = (0, 1)
                 elif event.key == K_LEFT and direction != (1, 0):
-                    direction = (-1, 0)
+                    pending_direction = (-1, 0)
                 elif event.key == K_RIGHT and direction != (-1, 0):
-                    direction = (1, 0)
+                    pending_direction = (1, 0)
                 elif event.key == K_ESCAPE:
                     return
                 elif event.key == K_p:
                     paused = not paused
                 else:
-                    secret_input += chr(event.key).upper()
-                    if "SNAKE" in secret_input:
-                        dragon_mode = True
-                        dragon_timer = current_time + 10000
-                        secret_input = ""
+                    # Проверяем, является ли клавиша буквенно-цифровой
+                    if event.unicode and event.unicode.isalnum():
+                        secret_input += event.unicode.upper()
+                        if "SNAKE" in secret_input:
+                            dragon_mode = True
+                            dragon_timer = current_time + 10000
+                            secret_input = ""
             if back_button.is_clicked(mouse_pos, event):
                 return
             if pause_button.is_clicked(mouse_pos, event):
@@ -230,6 +233,7 @@ def snake_game():
         
         if not paused and current_time - last_move_time > 1000 // speed:
             last_move_time = current_time
+            direction = pending_direction
             if dragon_mode and current_time > dragon_timer:
                 dragon_mode = False
             new_head = (snake[0][0] + direction[0], snake[0][1] + direction[1])
@@ -468,24 +472,20 @@ def main_menu():
     game_functions = {0: snake_game, 1: game_2048}
     
     while True:
-        # Обновляем прямоугольники кнопок, чтобы они реагировали на изменение размеров окна
         for button in buttons:
             button.update_rect()
         
         screen.fill(BLACK)
         draw_animated_background()
         
-        # Заголовок
         title = font_large.render("Игровой проект", True, YELLOW)
         title_y = scale_value(50, BASE_SCREEN_HEIGHT, SCREEN_HEIGHT)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, title_y))
         
-        # Текст разработчиков
         developers = font_small.render("Разработчики: Ташевский, Каравашкин, Бехнуд, Алексеев", True, CYAN)
         dev_y = title_y + scale_value(80, BASE_SCREEN_HEIGHT, SCREEN_HEIGHT)
         screen.blit(developers, (SCREEN_WIDTH // 2 - developers.get_width() // 2, dev_y))
         
-        # Кнопки
         mouse_pos = pygame.mouse.get_pos()
         for button in buttons:
             button.check_hover(mouse_pos)
