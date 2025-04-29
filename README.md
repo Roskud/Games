@@ -34,16 +34,27 @@
 
 ---
 
+## Установка зависимостей
+
+Для запуска проекта необходим Python 3.7+.
+
+Установите все зависимости одной командой:
+```sh
+pip install -r requirements.txt
+```
+
+Если файла `requirements.txt` нет, используйте:
+```sh
+pip install pygame numpy pyinstaller
+```
+
+---
+
 ## Запуск из исходников
 
-1. **Установите зависимости:**
-    ```
-    pip install pygame numpy
-    ```
+1. **Положите звуковые файлы** (`background_music.wav`, `click.wav`, `button_hover.wav`) в папку с `main.py`.
 
-2. **Положите звуковые файлы** (`background_music.wav`, `click.wav`, `button_hover.wav`) в папку с `main.py`.
-
-3. **Запустите игру:**
+2. **Запустите игру:**
     ```
     python main.py
     ```
@@ -52,7 +63,7 @@
 
 ## Сборка exe-файла
 
-1. **Установите PyInstaller:**
+1. **Установите PyInstaller (если не установлен):**
     ```
     pip install pyinstaller
     ```
